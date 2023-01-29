@@ -6,6 +6,7 @@ main:
          - sendmail: {}
          - shiplabel: {}
          - message: {}
+         - cloudrun: {}
     - decode_pubsub_message:
         assign:
            - base64: ${base64.decode(event.data.message.data)}
@@ -37,9 +38,25 @@ main:
                  - assignResult2:
                      assign:
                        - shiplabel: ${sl.body}
+
+    - cloud_run:
+        call: http.post
+        args:
+          url: https://cr-u23uybcw6q-uc.a.run.app
+          auth:
+            type: OIDC
+          body:
+            input: ${shiplabel}
+        result: cr_result
+    - assignResult3:
+        assign:
+          - cloudrun: ${cr_result.code}
     - result:
         # some finish
         return: 
           - ${message}
           - ${shiplabel}
           - ${sendmail}
+          # ${cloudrun}
+          - "Cloud Run service updated"
+          - "End of Workflow"
