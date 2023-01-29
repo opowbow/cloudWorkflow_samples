@@ -1,0 +1,45 @@
+main:
+  params: [event]
+  steps:
+    - initvars:
+       assign:
+         - sendmail: {}
+         - shiplabel: {}
+         - message: {}
+    - decode_pubsub_message:
+        assign:
+           - base64: ${base64.decode(event.data.message.data)}
+           - message: ${text.decode(base64)}
+    - parallelwf:
+       parallel:
+         #shared: [userProfile, recentItems]  # userProfile and recentItems are shared 
+         shared: [sendmail, shiplabel]
+         branches:
+           - b_SendMail:
+               steps:
+                 - s_sm:
+                     call: http.get
+                     args:
+                       # specify cloud function trigger
+                       url: https://europe-west1-qwiklabs-gcp-02-68856f1b0db7.cloudfunctions.net/send_mail
+                     result: sm
+                 - assignResult1:
+                     assign:
+                       - sendmail: ${sm.body}
+           - b_ShipLabel:
+               steps:
+                 - s_sl:
+                     call: http.get
+                     args:
+                        # specify cloud function trigger
+                        url: https://europe-west1-qwiklabs-gcp-02-68856f1b0db7.cloudfunctions.net/ship_label 
+                     result: sl
+                 - assignResult2:
+                     assign:
+                       - shiplabel: ${sl.body}
+    - result:
+        # some finish
+        return: 
+          - ${message}
+          - ${shiplabel}
+          - ${sendmail}
