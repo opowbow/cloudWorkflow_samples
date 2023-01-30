@@ -1,6 +1,8 @@
 main:
+# incoming pub sub message
   params: [event]
   steps:
+  # init vars 
     - initvars:
        assign:
          - sendmail: {}
@@ -8,38 +10,40 @@ main:
          - message: {}
          - cloudrun: {}
     - decode_pubsub_message:
+    # decode and output at end of wf
         assign:
            - base64: ${base64.decode(event.data.message.data)}
            - message: ${text.decode(base64)}
     - parallelwf:
+    # parallel workflow - 2 functions
        parallel:
-         #shared: [userProfile, recentItems]  # userProfile and recentItems are shared 
+         #shared variables: [userProfile, recentItems]  # userProfile and recentItems are shared 
          shared: [sendmail, shiplabel]
          branches:
            - b_SendMail:
                steps:
-                 - s_sm:
+                 - call_sm:
                      call: http.get
                      args:
                        # specify cloud function trigger
                        url: https://europe-west1-qwiklabs-gcp-02-68856f1b0db7.cloudfunctions.net/send_mail
                      result: sm
-                 - assignResult1:
+                 - result-sm:
                      assign:
                        - sendmail: ${sm.body}
            - b_ShipLabel:
                steps:
-                 - s_sl:
+                 - call_sl:
                      call: http.get
                      args:
                         # specify cloud function trigger
                         url: https://europe-west1-qwiklabs-gcp-02-68856f1b0db7.cloudfunctions.net/ship_label 
                      result: sl
-                 - assignResult2:
+                 - result-sl:
                      assign:
                        - shiplabel: ${sl.body}
 
-    - cloud_run:
+    - call-cloudrun:
         call: http.post
         args:
           url: https://cr-u23uybcw6q-uc.a.run.app
@@ -48,11 +52,11 @@ main:
           body:
             input: ${shiplabel}
         result: cr_result
-    - assignResult3:
+    - result-cr:
         assign:
           - cloudrun: ${cr_result.code}
     - result:
-        # some finish
+        # output results
         return: 
           - ${message}
           - ${shiplabel}
