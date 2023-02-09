@@ -2,22 +2,32 @@ main:
 # incoming pub sub message
   params: [event]
   steps:
-  # init vars 
-    - initvars:
+ # init global vars
+   - initvars:
        assign:
          - sendmail: {}
          - shiplabel: {}
          - message: {}
          - cloudrun: {}
-    - decode_pubsub_message:
+         - pubsubdata: {}
+         # vars for publishing a message
+
+         - project: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
+         - topic: "order_fulfillment"
+         - subscription: "order_fulfillment_sub"
+         - message: {"order": "fulfilled"}  # An object used as a secret.
+         - base64Msg: ${base64.encode(json.encode(message))}
+
+   - decode_pubsub_message:
     # decode and output at end of wf
-        assign:
-           - base64: ${base64.decode(event.data.message.data)}
-           - message: ${text.decode(base64)}
-    - parallelwf:
-    # parallel workflow - 2 functions
+       assign:
+         - base64: ${base64.decode(event.data.message.data)}
+         - message: ${text.decode(base64)}
+
+   - parallelwf:
+   # parallel workflow - 2 functions
        parallel:
-         #shared variables: [userProfile, recentItems]  # userProfile and recentItems are shared 
+        #shared variables
          shared: [sendmail, shiplabel]
          branches:
            - b_SendMail:
@@ -25,8 +35,8 @@ main:
                  - call_sm:
                      call: http.get
                      args:
-                       # specify cloud function trigger
-                       url: https://europe-west1-qwiklabs-gcp-02-68856f1b0db7.cloudfunctions.net/send_mail
+                      # specify cloud function trigger
+                       url: https://europe-west1-qwiklabs-gcp-01-28aad5331494.cloudfunctions.net/send_mail
                      result: sm
                  - result-sm:
                      assign:
@@ -36,31 +46,47 @@ main:
                  - call_sl:
                      call: http.get
                      args:
-                        # specify cloud function trigger
-                        url: https://europe-west1-qwiklabs-gcp-02-68856f1b0db7.cloudfunctions.net/ship_label 
+                       # specify cloud function trigger
+                       url: https://europe-west1-qwiklabs-gcp-01-28aad5331494.cloudfunctions.net/ship_label
                      result: sl
                  - result-sl:
                      assign:
                        - shiplabel: ${sl.body}
+   - call-cloudrun:
+       call: http.post
+       args:
+         url: https://order-service-ecsq5losua-ew.a.run.app
+         auth:
+           type: OIDC
+         body:
+           input: ${shiplabel}
+       result: cr_result
+   - result-cr:
+       assign:
+    # Capture date from execution - code, body etc
+         - cloudrun: ${cr_result.code}
 
-    - call-cloudrun:
-        call: http.post
-        args:
-          url: https://cr-u23uybcw6q-uc.a.run.app
-          auth:
-            type: OIDC
-          body:
-            input: ${shiplabel}
-        result: cr_result
-    - result-cr:
-        assign:
-          - cloudrun: ${cr_result.code}
-    - result:
-        # output results
-        return: 
-          - ${message}
-          - ${shiplabel}
-          - ${sendmail}
-          # ${cloudrun}
-          - "Cloud Run service updated"
-          - "End of Workflow"
+   - publish_message_to_topic:
+       call: googleapis.pubsub.v1.projects.topics.publish
+       args:
+         topic: ${"projects/" + project + "/topics/" + topic}
+         body:
+           messages:
+             - data: '${base64Msg}'
+       result: psd
+
+   - result-publish:
+       assign:
+         - pubsubdata: ${psd.body}
+
+   - result_finish:
+       # output results
+       return:
+         - ${message}
+         - ${shiplabel}
+         - ${sendmail}
+         # ${cloudrun}
+         - "Cloud Run service updated"
+         - ${pubsubdata}
+         - "Order fulfilled"
+         - “End of Workflow”
