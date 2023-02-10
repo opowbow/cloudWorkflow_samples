@@ -13,9 +13,16 @@ main:
          # vars for publishing a message
 
          - project: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
-         - topic: "order_fulfillment"
+         
+# VARIABLE - this is pub sub in step 8 - load env vars for these as per above line
+         - topic: "order_fulfillment"  # this is pub sub topic in step 8 - $FILLEDTOPIC
+         
+# VARIABLE - this is pub sub subscription in step 8 - $FILLEDSUB
          - subscription: "order_fulfillment_sub"
-         - message: {"order": "fulfilled"}  # An object used as a secret.
+         
+# VARIABLE - message to update order - $ORDERID  and $FILLEDMSG
+         - message: {"orderID": "fulfilled"}  # An object used as a secret
+         
          - base64Msg: ${base64.encode(json.encode(message))}
 
    - decode_pubsub_message:
@@ -36,6 +43,7 @@ main:
                      call: http.get
                      args:
                       # specify cloud function trigger
+# VARIABLE - Cloud Funtion - send_mail-  trigger URL: $TRIGMAIL
                        url: https://europe-west1-qwiklabs-gcp-01-28aad5331494.cloudfunctions.net/send_mail
                      result: sm
                  - result-sm:
@@ -47,6 +55,7 @@ main:
                      call: http.get
                      args:
                        # specify cloud function trigger
+# VARIABLE - Cloud Funtion trigger - ship_label - URL :$TRIGLABEL
                        url: https://europe-west1-qwiklabs-gcp-01-28aad5331494.cloudfunctions.net/ship_label
                      result: sl
                  - result-sl:
@@ -55,6 +64,7 @@ main:
    - call-cloudrun:
        call: http.post
        args:
+# VARIABLE - Cloud RUN service URL :$CR_SVC_URL
          url: https://order-service-ecsq5losua-ew.a.run.app
          auth:
            type: OIDC
