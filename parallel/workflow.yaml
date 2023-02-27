@@ -15,10 +15,10 @@ main:
          - project: ${sys.get_env("GOOGLE_CLOUD_PROJECT_ID")}
          
 # VARIABLE - this is pub sub in step 8 - load env vars for these as per above line
-         - topic: "order_fulfillment"  # this is pub sub topic in step 8 - $FILLEDTOPIC
+         - topic: "order_filled"  # this is pub sub topic in step 8 - $FILLEDTOPIC
          
 # VARIABLE - this is pub sub subscription in step 8 - $FILLEDSUB
-         - subscription: "order_fulfillment_sub"
+         - subscription: "order_filled_sub"
          
 # VARIABLE - message to update order - $ORDERID  and $FILLEDMSG
          - message: {"orderID": "fulfilled"}  # An object used as a secret
